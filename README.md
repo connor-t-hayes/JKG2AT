@@ -9,9 +9,9 @@ This project connects a Jupyter Notebook server running on either Linux on x86 o
 
 
 ## Install Jupyter Kernel Gateway and Apache Toree on z/OS
-To install the Jupyter Kernel Gateway to Apache Toree solution on z/OS, follow the [KG2AT instructions](<fix_here>).
+To install the Jupyter Kernel Gateway to Apache Toree solution on z/OS, follow the [KG2AT instructions](zos/README.md).
 
 ## Install Jupyter Notebook server with nb2kg Extention
-To install a Jupyter Notebook server in a Docker container with nb2kg instructions on x86 follow the [nb2kg x86 instructions](<fix_here>).
+To install a Jupyter Notebook server in a Docker container with nb2kg instructions on x86 follow the [nb2kg x86 instructions](x86/README.md).
 
-To install a Jupyter Notebook server in a Docker container with nb2kg instructions on Linux on z follow the [nb2kg loz instructions](<fix_here>).
+To install a Jupyter Notebook server in a Docker container with nb2kg instructions on Linux on z follow the [nb2kg loz instructions](loz/README.md).
