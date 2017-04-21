@@ -1,0 +1,15 @@
+# (c) Copyright IBM Corp. 2016.  All Rights Reserved.
+# Distributed under the terms of the Modified BSD License.
+
+WORKBENCH_PORT=${WORKBENCH_PORT:="8888"}
+WORKBENCH_NAME=${WORKBENCH_NAME:="default-notebook"}
+WORKBENCH_VOLUME=${WORKBENCH_VOLUME:="default-volume"}
+WORKBENCH_CRT=${WORKBENCH_CRT:=""}
+WORKBENCH_KEY=${WORKBENCH_KEY:=""}
+WORKBENCH_TOKEN=${WORKBENCH_TOKEN:="YES"} # If you wish for no token, comment out this line
+
+# In the following configuration, it is strongly suggested that you use IP instead of Hostname, 
+# this is because not all hostnames will be resolvable by the Docker container.
+# Example: "http://<ip>:<port>".  
+KG_URL=${KG_URL:=""} 
+KG_AUTH_TOKEN=${KG_AUTH_TOKEN:=""}

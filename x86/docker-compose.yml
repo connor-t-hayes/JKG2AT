@@ -1,0 +1,34 @@
+# (c) Copyright IBM Corp. 2016.  All Rights Reserved.
+# Distributed under the terms of the Modified BSD License.
+version: "2"
+
+services:
+  notebook:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: nb2kg/notebook
+    container_name: ${WORKBENCH_NAME}
+    ports:
+     - "${WORKBENCH_PORT}:8888"
+    environment:
+      KG_URL: ${KG_URL}
+      KG_AUTH_TOKEN: ${KG_AUTH_TOKEN}
+      GEN_CERT: "yes"
+      #VALIDATE_KG_CERT: "false"
+    command: >
+      jupyter notebook
+      --NotebookApp.ip=0.0.0.0
+      --NotebookApp.session_manager_class=nb2kg.managers.SessionManager
+      --NotebookApp.kernel_manager_class=nb2kg.managers.RemoteKernelManager
+      --NotebookApp.kernel_spec_manager_class=nb2kg.managers.RemoteKernelSpecManager
+      ${SSL_STR}
+      ${TOKEN}
+      --debug
+    volumes:
+      - "work:/home/jovyan/work"
+      - "./security:/tmp/security"
+volumes:
+  work:
+    external:
+      name: ${WORKBENCH_VOLUME}
