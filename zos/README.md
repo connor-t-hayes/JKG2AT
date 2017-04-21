@@ -6,6 +6,7 @@
 ## Table of Contents
 - [Overview](#overview)
 - [Prerequisites](#prerequisites)
+- [Sizing Considerations](#sizing-considerations)
 - [Install Jupyter Kernel Gateway and Apache Toree](#install-jupyter-kernel-gateway-and-apache-toree)
    - [Transfer Compressed Files](#transfer-compressed-files)
    - [setupEcosystem Script](#setupecosystem-script)
@@ -36,6 +37,9 @@ Apache Spark 2.0.2 cluster.
 
 * [gunzip](http://www.rocketsoftware.com/zos-open-source/gzip)
 * [IBM z/OS Platform for Apache Spark 2.0.2](http://www-03.ibm.com/systems/z/os/zos/apache-spark.html)
+
+## Sizing Considerations
+This solution will require a fair bit of disk space.  The installation files alone will require more than 500MB of storage. In addition to this, because installation files will expand you will need a total of 3.7GB of available disk space to successfully install this solution.
 
 ## Install Jupyter Kernel Gateway and Apache Toree
 
