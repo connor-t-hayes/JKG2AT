@@ -46,7 +46,7 @@ PY4J_ZIP="py4j-0.10.3-src"
 INSTALL_DIR=""
 TAR_DIR=""
 KG2AT_CONF="$PWD/.kg2at_conf"
-
+#KG2AT_CONF="$INSTALL_DIR/.kg2at_conf"
 ZIP_EXTENSION=".zip"
 TAR_EXTENSION=".tar.gz"
 
@@ -147,8 +147,19 @@ if [[ $INSTALL_DIR = "" || $INSTALL_DIR == *"/."* || $INSTALL_DIR == *"./"* ]]; 
 else
   # Verify a valid directory
   if [ ! -d "$INSTALL_DIR" ]; then
-    echo "Install Directory $INSTALL_DIR does not exist"
+    echo "Install Directory $INSTALL_DIR does not exist "
+    read -r -p "would you like to create directory $INSTALL_DIR ?" response
+  response=${response,,} # to lower
+  if [[ $response =~ ^(yes|y| ) ]]; then
+    echo "creating directory $INSTALL_DIR"
+     mkdir $INSTALL_DIR
+  elif [[ $response =~ ^(no|n| ) ]]; then
+    echo "Please create $INSTALL_DIR and try again"
     exit 1
+  else
+    echo "Neither Y or N specified, assuming NO"
+    exit 1
+    fi
   fi
 fi
 
@@ -195,6 +206,12 @@ if checkForAndInstall $PYTHON_DIR; then
   echo "Unpackaging Python (this may take several minutes)"
   cd $PYTHON_DIR
   cat $TAR_DIR/$PYTHON_TAR$TAR_EXTENSION | gunzip -c | tar xUXof -
+
+  if [ $? != 0 ]; then
+    echo "Python Unpackaging failed"
+    exit 101
+  fi
+
   PYTHON_EXTRACTED=$PYTHON_DIR/$PYTHON_TAR
   cd $PYTHON_EXTRACTED
   
@@ -208,6 +225,11 @@ if checkForAndInstall $PYTHON_DIR; then
   echo "Installing Python (this may take half an hour)"
   bin/install_all_packages
 
+   if [ $? != 0 ]; then
+    echo "Python Installation failed"
+    exit 103
+  fi
+
   echo "python installation done"
 fi
 
@@ -218,11 +240,25 @@ if checkForAndInstall $TOREE_DIR; then
   echo "Installing Toree"
   cd $TOREE_DIR
   cat $TAR_DIR/$TOREE_TAR$TAR_EXTENSION |  gunzip -c | tar xUXof -
+
+   if [ $? != 0  ]; then
+    echo "Torre Unpackaging failed"
+    exit 111
+  fi
+
   cd $TOREE_TAR
   chtag -t -c iso8859-1 -R *
   # TODO: add checks to build/install
   python setup.py build
+   if [ $? != 0 ]; then
+    echo "Build failure"
+    exit 112
+  fi
   python setup.py install
+   if [ $? != 0 ]; then
+    echo "Installation Failure"
+    exit 113
+  fi
   convertToEBCDIC $PYTHON_EXTRACTED/$PYTHON_VERSION/bin/jupyter
   jupyter toree install --user
   convertToEBCDIC $HOME/.local/share/jupyter/kernels/apache_toree_scala/bin/run.sh
@@ -233,15 +269,30 @@ if checkForAndInstall $KERNEL_DIR; then
   echo "Installing Jupyter Kernel Gateway"
   cd $KERNEL_DIR
   cat $TAR_DIR/$KERNEL_TAR$TAR_EXTENSION |  gunzip -c | tar xUXof -
-  cd $KERNEL_TAR
+
+  if [ $? != 0  ]; then
+    echo "Kernal Gateway Unpackaging failed"
+    exit 121
+  fi
+
   chtag -t -c iso8859-1 -R *
+  cd $KERNEL_TAR
   # TODO: add checks to build/install
   python setup.py build
+   if [ $? != 0 ]; then
+    echo "Build failure"
+    exit 122
+  fi
   python setup.py install
+   if [ $? != 0 ]; then
+    echo "Installation failure"
+    exit 123
+  fi
   convertToEBCDIC $PYTHON_EXTRACTED/$PYTHON_VERSION/bin/jupyter
 fi
 
 # If .kg2at_conf exists, find out if user wants to replace
+KG2AT_CONF="$INSTALL_DIR/.kg2at_conf"
 if [[ -f $KG2AT_CONF ]]; then
   read -r -p "Configuration file exists, do you want to rewrite? Y or (N)? " response
   response=${response,,} # to lower
