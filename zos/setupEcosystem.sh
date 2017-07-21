@@ -269,6 +269,7 @@ if checkForAndInstall $KERNEL_DIR; then
   echo "Installing Jupyter Kernel Gateway"
   cd $KERNEL_DIR
   cat $TAR_DIR/$KERNEL_TAR$TAR_EXTENSION |  gunzip -c | tar xUXof -
+   cd $KERNEL_TAR
 
   if [ $? != 0  ]; then
     echo "Kernal Gateway Unpackaging failed"
