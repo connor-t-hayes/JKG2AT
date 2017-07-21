@@ -148,13 +148,17 @@ else
   # Verify a valid directory
   if [ ! -d "$INSTALL_DIR" ]; then
     echo "Install Directory $INSTALL_DIR does not exist "
-    read -p "would you like to create directory $INSTALL_DIR ?" -n 1 -r
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-     echo "creating directory $INSTALL_DIR"
+    read -r -p "would you like to create directory $INSTALL_DIR ?" response
+  response=${response,,} # to lower
+  if [[ $response =~ ^(yes|y| ) ]]; then
+    echo "creating directory $INSTALL_DIR"
      mkdir $INSTALL_DIR
-    else
-        echo "Installation Failed: Please create an installation directory"
-        exit 1
+  elif [[ $response =~ ^(no|n| ) ]]; then
+    echo "Please create $INSTALL_DIR and try again"
+    exit 1
+  else
+    echo "Neither Y or N specified, assuming NO"
+    exit 1
     fi
   fi
 fi
