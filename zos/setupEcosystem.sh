@@ -44,12 +44,17 @@ PY4J_ZIP="py4j-0.10.3-src"
 
 # Set Default Variables
 INSTALL_DIR=""
+INST_DIR_NOT_SET=true
 TAR_DIR=""
 KG2AT_CONF="$PWD/.kg2at_conf"
 #KG2AT_CONF="$INSTALL_DIR/.kg2at_conf"
 ZIP_EXTENSION=".zip"
 TAR_EXTENSION=".tar.gz"
-
+PYTHON_LOG="python.log"
+KERNEL_LOG="kernelGateway.log"
+TOREE_LOG="toree.log"
+DEBUG_MODE=false
+VERIFY_MODE=false
 # Check for install directory, create and set flag if not found
 # Usage: checkForInstall $INSTALL_DIRECTORY
 
@@ -102,6 +107,31 @@ convertToEBCDIC ()
   chtag -t -c IBM-1047 $1
 }
 
+#verify Installation
+#verifies everything was installed properly
+verifyInstall ()
+{
+type python
+ if [ $? != 0 ]; then
+ echo "cannot verify python was installed correctly"
+ exit 400
+else
+echo "Python Install Verified"
+ fi
+if [ "$(python $PYTHONHOME/bin/jupyter toree --version)" != "0.2.0.dev1" ]; then
+echo "cannot verify toree was installed correctly"
+exit 401
+else
+echo "Apache Toree Install Verified"
+fi
+if [ "$(python $PYTHONHOME/bin/jupyter kernelgateway --version)" != "1.2.1"  ]; then
+echo "cannot verify kernel gateway was installed correctly"
+exit 402
+else
+echo "Kernel Gateway Install Verified"
+fi
+}
+
 showUsage()
 {
   echo "Usage:  ./setupEcosystem.sh [-i, --install_directory] <install_dir> "
@@ -134,34 +164,57 @@ until [ "$#" -eq 0 ]; do
       shift
       TAR_DIR=$1
       shift;;
+     "--debug"|"-d")
+     shift
+     DEBUG_MODE=true
+     shift;;
+      "--verify"|"-v")
+     shift
+     VERIFY_MODE=true
+     shift;;
     *)
       echo "Unrecognized option: $1"
       showUsage
   esac
 done
 
+if  [ "$DEBUG_MODE" == true ]; then
+echo "RUNNING IN DEBUG MODE"
+set -x
+env
+fi
 # Check valid parameters
 if [[ $INSTALL_DIR = "" || $INSTALL_DIR == *"/."* || $INSTALL_DIR == *"./"* ]]; then
   echo "Install Directory $INSTALL_DIR must be an absolute path"
   showUsage
 else
   # Verify a valid directory
-  if [ ! -d "$INSTALL_DIR" ]; then
-    echo "Install Directory $INSTALL_DIR does not exist "
-    read -r -p "would you like to create directory $INSTALL_DIR ?" response
-  response=${response,,} # to lower
-  if [[ $response =~ ^(yes|y| ) ]]; then
-    echo "creating directory $INSTALL_DIR"
-     mkdir $INSTALL_DIR
-  elif [[ $response =~ ^(no|n| ) ]]; then
-    echo "Please create $INSTALL_DIR and try again"
-    exit 1
-  else
-    echo "Neither Y or N specified, assuming NO"
-    exit 1
-    fi
-  fi
+     if [ ! -d "$INSTALL_DIR" ]; then
+        echo "Install Directory $INSTALL_DIR does not exist "
+        while $INST_DIR_NOT_SET; do
+        read -r -p "would you like to create directory $INSTALL_DIR ?" response
+        response=${response,,} # to lower
+        case $response in
+            [Yy]*)
+                echo "creating directory $INSTALL_DIR"
+                INST_DIR_NOT_SET=false
+                mkdir $INSTALL_DIR
+                ;;
+            [Nn]*)
+             echo "Please create $INSTALL_DIR and try again"
+             INST_DIR_NOT_SET=false
+            exit 1
+            ;;
+             *)
+            echo "Please answer yes or no."
+            ;;
+
+        esac
+        done
+     fi
 fi
+
+
 
 if [[ $TAR_DIR == *"/."* || $TAR_DIR == *"./"* ]]; then
   echo "Tar Directory $TAR_DIR must be an absolute path"
@@ -189,7 +242,10 @@ fi
 PYTHON_DIR=$INSTALL_DIR/python
 TOREE_DIR=$INSTALL_DIR/toree
 KERNEL_DIR=$INSTALL_DIR/kernel_gateway
-
+STATUS_LOG="$INSTALL_DIR/status.log"
+PYTHON_LOG="$PYTHON_DIR/python.log"
+KERNEL_LOG="$KERNEL_DIR/KERNELGateway.log"
+TOREE_LOG="$TOREE_DIR/toree.log"
 # Verify files are available
 verifyAvailableFiles $TAR_DIR $PYTHON_TAR $TAR_EXTENSION
 verifyAvailableFiles $TAR_DIR $TOREE_TAR $TAR_EXTENSION
@@ -205,16 +261,23 @@ fi
 if checkForAndInstall $PYTHON_DIR; then
   echo "Unpackaging Python (this may take several minutes)"
   cd $PYTHON_DIR
+
+  echo "Starting upackaging of Python" >> $PYTHON_LOG
   cat $TAR_DIR/$PYTHON_TAR$TAR_EXTENSION | gunzip -c | tar xUXof -
 
   if [ $? != 0 ]; then
-    echo "Python Unpackaging failed"
+    echo "Python Unpackaging failed" >>  $PYTHON_LOG
+    echo "Python Unpackaging: Fail" >> $STATUS_LOG
     exit 101
+  else
+    echo "Python Unpackaging Successfull" >> $PYTHON_LOG
+    echo "Python Unpackaging: Success" >> $STATUS_LOG
+
   fi
 
   PYTHON_EXTRACTED=$PYTHON_DIR/$PYTHON_TAR
   cd $PYTHON_EXTRACTED
-  
+
   # exports needed by install_all_packages
   export BASH_PREFIX="$(type bash | awk '{print $3}' | sed 's/.\{5\}$//')"
   export PERL_PREFIX="not needed for python 27"
@@ -223,75 +286,140 @@ if checkForAndInstall $PYTHON_DIR; then
   export PYTHON_VERSION=python27 # you may change this to python36
   cd $PYTHON_EXTRACTED/$PYTHON_VERSION
   echo "Installing Python (this may take half an hour)"
-  bin/install_all_packages
+  # check log to make sure packaging was successful
+  if [ "$(tail -1 $STATUS_LOG)" == "Python Unpackaging: Success" ]; then
+    #install and check return code
+    bin/install_all_packages >> $PYTHON_LOG
+    if [ $? != 0 ]; then
 
-   if [ $? != 0 ]; then
-    echo "Python Installation failed"
-    exit 103
+        echo "Python Installation failed: Returned non zero return code " >> $PYTHON_LOG
+        echo "Python Install: Fail:" >> $STATUS_LOG
+        exit 103
+    else
+          echo "python installed successfully" >> $PYTHON_LOG
+          echo "Python Install: Success" >> $STATUS_LOG
+
+    fi
+  else
+    echo "Python Installation failed because it has not been succesfully unpackaged" >> $PYTHON_LOG
+    echo "Python Install: Fail" >> $STATUS_LOG
   fi
+    echo "python installation done"
 
-  echo "python installation done"
 fi
-
 setupPythonVariables
 
+if [ "$(tail -1 $STATUS_LOG)" != "Python Install: Success" ]; then
+echo "Cannot Begin Torre install as their was an issue with the python Installation"
+echo "$(tail -1 $STATUS_LOG)"
+exit 103
+fi
 # Toree Install
 if checkForAndInstall $TOREE_DIR; then
-  echo "Installing Toree"
+  echo "Installing Toree" >>  $STATUS_LOG
   cd $TOREE_DIR
+  echo "Starting upackaging of Apache Toree" >> $TOREE_LOG
+  #decompress torre and check return code
   cat $TAR_DIR/$TOREE_TAR$TAR_EXTENSION |  gunzip -c | tar xUXof -
-
    if [ $? != 0  ]; then
-    echo "Torre Unpackaging failed"
+    echo "Torre Unpackaging failed: returned a non zero return code" >> $TOREE_LOG
+     echo "Torre Unpackaging: Fail" >> $STATUS_LOG
     exit 111
-  fi
+   fi
 
   cd $TOREE_TAR
   chtag -t -c iso8859-1 -R *
-  # TODO: add checks to build/install
-  python setup.py build
+  # builds and checks return code
+  python setup.py build &>> $TOREE_LOG
    if [ $? != 0 ]; then
-    echo "Build failure"
+    echo "Toree Build Failed: returned a non zero return code" >> $TOREE_LOG
     exit 112
   fi
-  python setup.py install
+  #install torre
+  python setup.py install &>> $TOREE_LOG
    if [ $? != 0 ]; then
-    echo "Installation Failure"
+    echo "Toree Installation Failure: returned a non zero return code" >> $TOREE_LOG
+    echo "Torre Install: Fail" >> $STATUS_LOG
     exit 113
+    else
+    echo "Toree installed successfully" >> $TOREE_LOG
+    echo "Toree Installation: Success" >> $STATUS_LOG
   fi
-  convertToEBCDIC $PYTHON_EXTRACTED/$PYTHON_VERSION/bin/jupyter
-  jupyter toree install --user
+  # check log to make sure toree install was completed succesfully
+   if [ "$(tail -1 $STATUS_LOG)" = "Toree Installation: Success" ]; then
+   python $PYTHONHOME/bin/jupyter toree install --user &>> $TOREE_LOG
+    if [ $? != 0 ]; then
+         echo "user Installation Failure" >> $TOREE_LOG
+         exit 113
+    else echo "Toree install: success" >> $TOREE_LOG
+         echo "Toree User Installation: Success" >> $STATUS_LOG
+    fi
+   else
+    echo "user Installation Failure" >> $TOREE_LOG
+    echo "Toree User Installation: Fail" >> $STATUS_LOG
+   fi
   convertToEBCDIC $HOME/.local/share/jupyter/kernels/apache_toree_scala/bin/run.sh
+fi
+ #check log to make sure Install completed succesfully
+ if [ "$(tail -1 $STATUS_LOG)" = "Toree Installation: Success" ]; then
+echo "Can not install Jupyter Kernal Gateway because Torre Install did not complete succesfully"
+exit 113
 fi
 
 # Kernel Gateway Install
 if checkForAndInstall $KERNEL_DIR; then
   echo "Installing Jupyter Kernel Gateway"
   cd $KERNEL_DIR
-  cat $TAR_DIR/$KERNEL_TAR$TAR_EXTENSION |  gunzip -c | tar xUXof -
-   cd $KERNEL_TAR
 
-  if [ $? != 0  ]; then
-    echo "Kernal Gateway Unpackaging failed"
+  echo "Unpackaging Jupyter Kernel Gateway " >> $KERNEL_LOG
+  # Unpackaging Jupyter Kernel Gateway with gunzip
+  cat $TAR_DIR/$KERNEL_TAR$TAR_EXTENSION |  gunzip -c | tar xUXof -
+  if [ $? != 0 ]; then #if unpackaging failed make sure log is updated
+    echo "Jupyter Kernel Gateway Unpackaging failed" >> $KERNEL_LOG
     exit 121
   fi
+      cd $KERNEL_TAR #if unpackaging was successful make sure log is updated
+     echo "Jupyter Kernel Gateway Unpackaging succesfull" >> $KERNEL_LOG
+    chtag -t -c iso8859-1 -R *
 
-  chtag -t -c iso8859-1 -R *
-  cd $KERNEL_TAR
-  # TODO: add checks to build/install
-  python setup.py build
+
+  python setup.py build &>> $KERNEL_LOG
    if [ $? != 0 ]; then
-    echo "Build failure"
+    echo "Build failure" >> $KERNEL_LOG
+     echo "Build failure"
     exit 122
+    else
+     echo "Build succeded"
+   echo "Build failure" >> $KERNEL_LOG
+    echo "Kernel Gateway Build: Success" >> $STATUS_LOG
   fi
-  python setup.py install
+
+  if [ "$(tail -1 $STATUS_LOG)" = "Kernel Gateway Build: Success" ]; then
+   # builds and checks return code
+    python setup.py install &>> $KERNEL_LOG
    if [ $? != 0 ]; then
+
     echo "Installation failure"
+    echo "Installation failure" >> $KERNEL_LOG
+    echo "Kernel Gateway Installation: Fail" >> $STATUS_LOG
+    exit 123
+    else
+     echo "Kernel Gateway Installation Succeded"
+    echo "Kernel Gateway Installation Succeded" >> $KERNEL_LOG
+    echo "Kernel Gateway Installation: Success" >> $STATUS_LOG
+  fi
+
+  else
+  echo "$(tail -1 $STATUS_LOG)"
+  echo "Build Failed"
+  exit 122
+  fi
+
+fi
+  if [  "$(tail -1 $STATUS_LOG)" != "Kernel Gateway Installation: Success" ]; then
+     echo "Installation failure" >> $KERNEL_LOG
     exit 123
   fi
-  convertToEBCDIC $PYTHON_EXTRACTED/$PYTHON_VERSION/bin/jupyter
-fi
-
 # If .kg2at_conf exists, find out if user wants to replace
 KG2AT_CONF="$INSTALL_DIR/.kg2at_conf"
 if [[ -f $KG2AT_CONF ]]; then
@@ -302,6 +430,7 @@ if [[ -f $KG2AT_CONF ]]; then
   elif [[ $response =~ ^(no|n| ) ]]; then
     exit 0
   else
+    #TODO: add continous prompt until y or n is entered
     echo "Neither Y or N specified, assuming NO"
     exit 0
   fi
@@ -316,10 +445,9 @@ echo '#!/bin/bash
 #
 #' >> $KG2AT_CONF
 
-echo '# Inform user that file is being sourced.
-echo "Project KG2AT Configuration Setup Started"
-echo '$lineSep'
-' >> $KG2AT_CONF
+echo "# Inform user that file is being sourced." >> $KG2AT_CONF
+echo "Project KG2AT Configuration Setup Started" >> $KG2AT_CONF
+echo "'$lineSep'" >> $KG2AT_CONF
 
 # Project KG2AT Python and Toree Configurations
 echo "# Python Environment Variables" >> $KG2AT_CONF
@@ -357,9 +485,9 @@ fi
 
 ' >> $KG2AT_CONF
 
-echo '# Inform user that file is finished.
+echo '# Inform user that file is finished.'
 echo '$lineSep'
-echo "KG2AT Configuration Setup Complete"' >> $KG2AT_CONF
+echo '"KG2AT Configuration Setup Complete"' >> $KG2AT_CONF
 
 #Warn if mandatory settings are missing
 if [[ $SPARK_HOME = "" ]]; then
@@ -383,3 +511,11 @@ else
   echo "Installation finished, source $KG2AT_CONF from your .profile or .bashrc"
 fi
 echo "$lineSep"
+if  [ $DEBUG_MODE == true ]; then
+set +x
+env
+fi
+
+if  [ $VERIFY_MODE == true ]; then
+verifyInstall
+fi
